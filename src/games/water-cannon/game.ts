@@ -64,6 +64,22 @@ export function isHit(shot: Shot, target: Target): boolean {
   return Math.hypot(shot.x - target.x, shot.y - target.y) <= target.radius;
 }
 
+/** True when the straight path from `from` to `shot` passes through the target. */
+export function crossesTarget(from: { x: number; y: number }, shot: Shot, target: Target): boolean {
+  const dx = shot.x - from.x;
+  const dy = shot.y - from.y;
+  const lengthSquared = dx * dx + dy * dy;
+  // How far along the path the point nearest the target's centre lies, from 0 to 1.
+  const t =
+    lengthSquared === 0
+      ? 0
+      : Math.max(
+          0,
+          Math.min(1, ((target.x - from.x) * dx + (target.y - from.y) * dy) / lengthSquared),
+        );
+  return Math.hypot(from.x + t * dx - target.x, from.y + t * dy - target.y) <= target.radius;
+}
+
 /** Fires one shot of water towards the aim point. Returns false if nothing fired. */
 export function fire(state: WaterCannonState, aimX: number, aimY: number): boolean {
   if (state.phase !== 'playing' || state.tank === 0) return false;
@@ -90,9 +106,10 @@ export function step(state: WaterCannonState, dt: number): void {
 
   const remaining: Shot[] = [];
   for (const shot of state.shots) {
+    const from = { x: shot.x, y: shot.y };
     shot.x += shot.vx * dt;
     shot.y += shot.vy * dt;
-    const target = state.targets.find((t) => isHit(shot, t));
+    const target = state.targets.find((t) => crossesTarget(from, shot, t));
     if (target) {
       state.score += scoreForHit(target);
       state.splashes.push({ x: target.x, y: target.y, age: 0 });
